@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Multiplication Quiz</title>
+  <meta name="description" content="A simple multiplication practice app. Works offline. Single HTML file for GitHub Pages." />
+  <link rel="icon" href="data:," />
+  <style>
+    :root{
+      --bg:#0b1020; --card:#121a2e; --accent:#6ee7ff; --text:#e6eefc; --muted:#9fb3d1; --good:#22c55e; --bad:#ef4444;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family:system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background:radial-gradient(1200px 800px at 80% -10%, rgba(110,231,255,.15), transparent 60%), var(--bg);
+      color:var(--text); display:grid; place-items:center; padding:24px;
+    }
+    .card{
+      width:min(760px, 100%); background:linear-gradient(180deg, rgba(255,255,255,.03), transparent), var(--card);
+      border:1px solid rgba(255,255,255,.07); border-radius:20px; box-shadow:0 10px 30px rgba(0,0,0,.35);
+      padding:24px; backdrop-filter: saturate(140%) blur(6px);
+    }
+    h1{margin:0 0 8px; font-size:clamp(22px, 3.6vw, 32px)}
+    p{margin:6px 0 18px; color:var(--muted)}
+    .row{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+    .chip{padding:6px 10px; border:1px solid rgba(255,255,255,.12); border-radius:999px; font-size:12px; color:var(--muted)}
+    .question{font-size:clamp(32px, 6vw, 54px); font-weight:700; letter-spacing:.5px; margin:14px 0 6px}
+    .operator{opacity:.9}
+    .input-wrap{display:flex; gap:10px; align-items:center; margin:10px 0 4px}
+    input[type=number]{
+      appearance:textfield; width:160px; max-width:45vw; font-size:clamp(18px, 3.6vw, 24px);
+      padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,.15);
+      background:#0e162a; color:var(--text); outline:none; transition:border-color .2s ease;
+    }
+    input[type=number]:focus{border-color:var(--accent)}
+    button{
+      border:0; padding:12px 16px; border-radius:12px; font-weight:600; cursor:pointer; letter-spacing:.3px;
+      background:linear-gradient(180deg, rgba(110,231,255,.5), rgba(110,231,255,.2)); color:#00222a;
+      box-shadow:0 6px 18px rgba(110,231,255,.25); transition:transform .06s ease;
+    }
+    button:active{transform:translateY(1px)}
+    .ghost{background:transparent; color:var(--text); border:1px solid rgba(255,255,255,.15); box-shadow:none}
+    .result{min-height:28px; margin:6px 0 8px; font-weight:600}
+    .good{color:var(--good)} .bad{color:var(--bad)}
+    .stats{display:flex; gap:12px; flex-wrap:wrap; margin-top:10px}
+    .stat{flex:1 1 120px; background:rgba(255,255,255,.04); padding:12px 14px; border-radius:14px; border:1px solid rgba(255,255,255,.08)}
+    .stat h3{margin:0; font-size:12px; color:var(--muted); font-weight:600; letter-spacing:.4px; text-transform:uppercase}
+    .stat p{margin:4px 0 0; font-size:20px; color:var(--text)}
+    .footer{margin-top:16px; font-size:12px; color:var(--muted)}
+    .range-wrap{display:flex; gap:10px; align-items:center}
+    input[type=range]{width:180px}
+    details{
+      margin-top:14px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px; padding:12px 14px;
+    }
+    details summary{cursor:pointer; font-weight:600}
+    pre{white-space:pre-wrap; word-break:break-word}
+    @media (max-width:480px){ .input-wrap{gap:8px} input[type=number]{width:120px} }
+  </style>
+</head>
+<body>
+  <main class="card" role="region" aria-labelledby="app-title">
+    <h1 id="app-title">Multiplication Quiz</h1>
+    <p>Practice random multiplication facts. Type your answer and press <kbd>Enter</kbd> or click <strong>Submit</strong>. Type <em>0</em> and submit to skip.</p>
+
+    <div class="row" aria-label="settings">
+      <span class="chip" title="Numbers range">Range:</span>
+      <div class="range-wrap">
+        <label for="maxN" class="chip" style="border:none">1–<span id="maxNLabel">10</span></label>
+        <input id="maxN" type="range" min="5" max="20" value="10" />
+      </div>
+      <span class="chip" title="Timer per question">Timer: <span id="timerToggleLabel">Off</span></span>
+      <button id="timerToggle" class="ghost" aria-pressed="false">Toggle</button>
+    </div>
+
+    <div class="question" aria-live="polite">
+      <span id="a" data-testid="a">?</span>
+      <span class="operator">×</span>
+      <span id="b" data-testid="b">?</span>
+      <span class="operator">=</span>
+      <span id="qnum" class="chip" title="Question #" style="margin-left:8px" data-testid="qnum"></span>
+    </div>
+
+    <div class="input-wrap">
+      <input id="answer" type="number" inputmode="numeric" placeholder="Your answer" aria-label="Your answer" autofocus data-testid="answer" />
+      <button id="submit" data-testid="submit">Submit</button>
+      <button id="skip" class="ghost" title="Skip (counts as wrong)" data-testid="skip">Skip</button>
+      <button id="reset" class="ghost" title="Reset stats" data-testid="reset">Reset</button>
+    </div>
+
+    <div id="result" class="result" aria-live="polite" data-testid="result"></div>
+
+    <section class="stats" aria-label="statistics">
+      <div class="stat"><h3>Score</h3><p id="score" data-testid="score">0</p></div>
+      <div class="stat"><h3>Attempts</h3><p id="attempts" data-testid="attempts">0</p></div>
+      <div class="stat"><h3>Accuracy</h3><p id="accuracy" data-testid="accuracy">0%</p></div>
+      <div class="stat"><h3>Streak</h3><p id="streak" data-testid="streak">0</p></div>
+      <div class="stat"><h3>Best Streak</h3><p id="best" data-testid="best">0</p></div>
+      <div class="stat"><h3>Time Left</h3><p id="timeleft" data-testid="timeleft">—</p></div>
+    </section>
+
+    <details>
+      <summary>Developer tools (self-tests)</summary>
+      <p>These tests are embedded to help validate logic in a browser-only environment.</p>
+      <div class="input-wrap">
+        <button id="runTests" class="ghost" data-testid="run-tests">Run self-tests</button>
+        <button id="clearStorage" class="ghost" data-testid="clear-storage">Clear saved stats</button>
+      </div>
+      <pre id="testOutput" data-testid="test-output" aria-live="polite"></pre>
+    </details>
+
+    <p class="footer">Single-file app. Your stats are saved locally in your browser.</p>
+  </main>
+
+  <script>
+    // --- Guard against noisy third‑party/extension errors (e.g., MetaMask) ---
+    (function guardThirdPartyNoise(){
+      function isIgnorableMetaMaskError(msg){
+        if(!msg) return false;
+        try{ return String(msg).toLowerCase().includes('metamask'); }catch(_){ return false; }
+      }
+      window.addEventListener('error', (e)=>{
+        if(isIgnorableMetaMaskError(e && e.message)){
+          console.info('[ignored] Extension error:', e.message);
+          e.preventDefault();
+        }
+      });
+      window.addEventListener('unhandledrejection', (e)=>{
+        const reason = e && e.reason ? (e.reason.message || e.reason) : '';
+        if(isIgnorableMetaMaskError(reason)){
+          console.info('[ignored] Extension unhandledrejection:', reason);
+          e.preventDefault();
+        }
+      });
+    })();
+
+    // --- App ---
+    (function(){
+      'use strict';
+      const aEl = document.getElementById('a');
+      const bEl = document.getElementById('b');
+      const ans = document.getElementById('answer');
+      const submit = document.getElementById('submit');
+      const skip = document.getElementById('skip');
+      const reset = document.getElementById('reset');
+      const result = document.getElementById('result');
+      const scoreEl = document.getElementById('score');
+      const attemptsEl = document.getElementById('attempts');
+      const accuracyEl = document.getElementById('accuracy');
+      const streakEl = document.getElementById('streak');
+      const bestEl = document.getElementById('best');
+      const timeleftEl = document.getElementById('timeleft');
+      const qnumEl = document.getElementById('qnum');
+      const maxN = document.getElementById('maxN');
+      const maxNLabel = document.getElementById('maxNLabel');
+      const timerToggle = document.getElementById('timerToggle');
+      const timerToggleLabel = document.getElementById('timerToggleLabel');
+      const runTestsBtn = document.getElementById('runTests');
+      const testOut = document.getElementById('testOutput');
+      const clearStorageBtn = document.getElementById('clearStorage');
+
+      let state = {
+        a: 0, b: 0, q: 0,
+        score: 0, attempts: 0, streak: 0, best: 0,
+        max: Number(localStorage.getItem('mq_max')) || 10,
+        timerOn: localStorage.getItem('mq_timer') === '1' ? true : false,
+        timeLimit: 12, // seconds per question when timer is on
+        remaining: null, tick: null,
+      };
+
+      function save(){
+        localStorage.setItem('mq_score', state.score);
+        localStorage.setItem('mq_attempts', state.attempts);
+        localStorage.setItem('mq_streak', state.streak);
+        localStorage.setItem('mq_best', state.best);
+        localStorage.setItem('mq_max', state.max);
+        localStorage.setItem('mq_timer', state.timerOn ? '1':'0');
+      }
+      function load(){
+        state.score = Number(localStorage.getItem('mq_score')) || 0;
+        state.attempts = Number(localStorage.getItem('mq_attempts')) || 0;
+        state.streak = Number(localStorage.getItem('mq_streak')) || 0;
+        state.best = Number(localStorage.getItem('mq_best')) || 0;
+      }
+
+      function rnd(n){ return Math.floor(Math.random()*n)+1; }
+
+      function newQuestion(){
+        state.q++;
+        state.a = rnd(state.max);
+        state.b = rnd(state.max);
+        aEl.textContent = state.a;
+        bEl.textContent = state.b;
+        qnumEl.textContent = `#${state.q}`;
+        ans.value = '';
+        ans.focus();
+        result.textContent = '';
+        stopTimer();
+        if(state.timerOn){ startTimer(); }
+      }
+
+      function startTimer(){
+        state.remaining = state.timeLimit;
+        timeleftEl.textContent = state.remaining + 's';
+        state.tick = setInterval(()=>{
+          state.remaining -= 1;
+          timeleftEl.textContent = state.remaining + 's';
+          if(state.remaining <= 0){
+            stopTimer();
+            mark(false, true); // timed out
+          }
+        },1000);
+      }
+      function stopTimer(){
+        if(state.tick){ clearInterval(state.tick); state.tick = null; }
+        if(!state.timerOn) timeleftEl.textContent = '—';
+      }
+
+      function stats(){
+        scoreEl.textContent = state.score;
+        attemptsEl.textContent = state.attempts;
+        const acc = state.attempts ? Math.round((state.score/state.attempts)*100) : 0;
+        accuracyEl.textContent = acc + '%';
+        streakEl.textContent = state.streak;
+        bestEl.textContent = state.best;
+      }
+
+      function mark(correct, timedOut=false){
+        state.attempts += 1;
+        const right = state.a * state.b;
+        if(correct){
+          state.score += 1;
+          state.streak += 1;
+          if(state.streak > state.best) state.best = state.streak;
+          result.textContent = '✅ Correct!';
+          result.className = 'result good';
+        } else {
+          state.streak = 0;
+          result.textContent = timedOut ? `⏰ Time's up! Correct: ${right}` : `❌ Wrong! Correct: ${right}`;
+          result.className = 'result bad';
+        }
+        save();
+        stats();
+        setTimeout(newQuestion, 550);
+      }
+
+      function submitAnswer(){
+        const valStr = String(ans.value).trim();
+        if(valStr === '') return; // ignore empty
+        const val = Number(valStr);
+        if(!Number.isFinite(val)) return;
+        if(val === 0){ // treat 0 as skip
+          mark(false, false);
+          return;
+        }
+        const correct = (val === state.a * state.b);
+        stopTimer();
+        mark(correct, false);
+      }
+
+      function resetAll(){
+        state.score = 0; state.attempts = 0; state.streak = 0; state.best = 0; state.q = 0;
+        save(); stats(); newQuestion();
+      }
+
+      // wire up
+      submit.addEventListener('click', submitAnswer);
+      skip.addEventListener('click', ()=>{ stopTimer(); mark(false,false); });
+      reset.addEventListener('click', resetAll);
+      ans.addEventListener('keydown', e=>{ if(e.key==='Enter') submitAnswer(); });
+
+      maxN.addEventListener('input', e=>{
+        state.max = Number(e.target.value);
+        maxNLabel.textContent = state.max;
+        save();
+        newQuestion();
+      });
+
+      timerToggle.addEventListener('click', ()=>{
+        state.timerOn = !state.timerOn;
+        timerToggle.setAttribute('aria-pressed', state.timerOn);
+        timerToggleLabel.textContent = state.timerOn ? 'On' : 'Off';
+        save();
+        stopTimer();
+        if(state.timerOn) startTimer();
+      });
+
+      // expose a tiny API for tests/dev only
+      window.mq = {
+        get state(){ return state; },
+        rnd, newQuestion, startTimer, stopTimer, stats,
+        mark, submitAnswer, resetAll,
+        _els: {aEl,bEl,ans,scoreEl,attemptsEl,accuracyEl,streakEl,bestEl,timeleftEl,qnumEl}
+      };
+
+      // init
+      load();
+      maxN.value = state.max; maxNLabel.textContent = state.max;
+      timerToggle.setAttribute('aria-pressed', state.timerOn);
+      timerToggleLabel.textContent = state.timerOn ? 'On' : 'Off';
+      stats();
+      newQuestion();
+
+      // --- Self-tests (run on demand) ---
+      function assert(name, cond){
+        return { name, pass: !!cond };
+      }
+      function line(msg){ testOut.textContent += msg + "\n"; }
+      function runSelfTests(){
+        if(!testOut) return;
+        testOut.textContent = '';
+        const results = [];
+
+        // snapshot & prepare
+        const snap = JSON.parse(JSON.stringify(state));
+        stopTimer();
+
+        // 1) rnd boundaries
+        let okRange = true; for(let i=0;i<500;i++){ const v = rnd(10); if(v<1||v>10||v!==Math.floor(v)) { okRange=false; break; } }
+        results.push(assert('rnd(n) returns integer within [1,n]', okRange));
+
+        // 2) newQuestion increments q and sets a,b in range
+        const qBefore = state.q; newQuestion();
+        const inRange = state.a>=1 && state.a<=state.max && state.b>=1 && state.b<=state.max;
+        results.push(assert('newQuestion() increments question number', state.q === qBefore+1));
+        results.push(assert('newQuestion() sets a,b within range', inRange));
+
+        // 3) mark(true/false) updates score/streak/attempts correctly
+        const a1 = state.attempts, s1 = state.score, st1 = state.streak;
+        mark(true); // +1 attempt, +1 score, +1 streak
+        results.push(assert('mark(true) increments attempts', state.attempts === a1+1));
+        results.push(assert('mark(true) increments score', state.score === s1+1));
+        results.push(assert('mark(true) increments streak', state.streak === st1+1));
+        const afterTrue = { attempts: state.attempts, streak: state.streak };
+        mark(false); // +1 attempt, streak resets to 0
+        results.push(assert('mark(false) increments attempts', state.attempts === afterTrue.attempts+1));
+        results.push(assert('mark(false) resets streak', state.streak === 0));
+
+        // 4) accuracy display matches computed value
+        const calcAcc = state.attempts ? Math.round((state.score/state.attempts)*100) : 0;
+        results.push(assert('accuracy text matches computed accuracy', accuracyEl.textContent.replace('%','') == String(calcAcc)));
+
+        // 5) timer toggle reflects aria-pressed & label
+        const prevPressed = timerToggle.getAttribute('aria-pressed');
+        timerToggle.click();
+        const nowPressed = timerToggle.getAttribute('aria-pressed');
+        const labelOK = timerToggleLabel.textContent === (nowPressed === 'true' ? 'On' : 'Off');
+        results.push(assert('timer toggle updates aria-pressed', prevPressed !== nowPressed));
+        results.push(assert('timer label matches state', labelOK));
+        // undo toggle
+        timerToggle.click();
+
+        // restore snapshot safely
+        state = Object.assign(state, snap);
+        save(); stats();
+
+        const passed = results.filter(r=>r.pass).length;
+        const total = results.length;
+        results.forEach(r=> line(`${r.pass ? '✅' : '❌'} ${r.name}`));
+        line(`\n${passed}/${total} tests passed.`);
+      }
+
+      if(runTestsBtn){ runTestsBtn.addEventListener('click', runSelfTests); }
+      if(clearStorageBtn){ clearStorageBtn.addEventListener('click', ()=>{ localStorage.clear(); load(); stats(); }); }
+    })();
+  </script>
+</body>
+</html>
